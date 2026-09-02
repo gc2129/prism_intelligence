@@ -1,0 +1,2428 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>PRISM: System Observatory</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Material+Symbols+Outlined" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        background: "#080D18",
+                        surface: "#0F1726",
+                        "surface-container": "#111C2D",
+                        "surface-container-high": "#182538",
+                        primary: "#3B82F6",
+                        cyan: "#22D3EE",
+                        tertiary: "#8B5CF6",
+                        success: "#34D399",
+                        warning: "#FBBF24",
+                        critical: "#FB7185",
+                        "on-surface": "#F8FAFC",
+                        "on-surface-variant": "#94A3B8",
+                        outline: "#475569",
+                        "outline-variant": "#334155"
+                    },
+                    fontFamily: {
+                        mono: ["JetBrains Mono", "monospace"],
+                        sans: ["Inter", "sans-serif"]
+                    }
+                }
+            }
+        };
+    </script>
+
+    <style>
+        body {
+            background:
+                radial-gradient(circle at 82% 10%, rgba(59, 130, 246, 0.14), transparent 25%),
+                radial-gradient(circle at 18% 85%, rgba(139, 92, 246, 0.10), transparent 30%),
+                #080D18;
+            color: #F8FAFC;
+            font-family: Inter, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            background-image:
+                linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px);
+            background-size: 42px 42px;
+            content: "";
+            inset: 0;
+            mask-image: linear-gradient(to bottom, black, transparent 70%);
+            opacity: 0.55;
+            pointer-events: none;
+            position: fixed;
+            z-index: -1;
+        }
+
+        .glass-panel {
+            background: linear-gradient(145deg, rgba(20, 31, 49, 0.96), rgba(12, 20, 35, 0.96));
+            border: 1px solid rgba(100, 116, 139, 0.35);
+            border-radius: 18px;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.20), inset 0 1px 0 rgba(255, 255, 255, 0.025);
+        }
+
+        .signal-pill {
+            background: rgba(34, 211, 238, 0.08);
+            border: 1px solid rgba(34, 211, 238, 0.25);
+            border-radius: 999px;
+        }
+
+        .telemetry-row {
+            border: 1px solid transparent;
+            border-radius: 14px;
+            padding: 0.8rem;
+            transition: all 0.2s ease;
+        }
+
+        .telemetry-row:hover {
+            background: rgba(30, 41, 59, 0.55);
+            border-color: rgba(71, 85, 105, 0.7);
+            transform: translateX(3px);
+        }
+
+        .chart-grid-line {
+            stroke: rgba(148, 163, 184, 0.17);
+            stroke-dasharray: 4 5;
+        }
+
+        .chart-label {
+            fill: #64748B;
+            font-family: "JetBrains Mono", monospace;
+            font-size: 10px;
+        }
+
+        .main-content {
+            margin-left: 16rem;
+            margin-top: 4rem;
+            min-height: calc(100vh - 4rem);
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0;
+            }
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% {
+                opacity: 0.6;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.12);
+            }
+        }
+
+        @keyframes floatAnimation {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        .pulse-dot {
+            animation: pulseGlow 2s infinite;
+        }
+
+        .prism-float {
+            animation: floatAnimation 4s ease-in-out infinite;
+        }
+
+        @keyframes prismTurn {
+            0%, 100% { transform: rotateX(0deg) rotateY(-8deg) rotateZ(0deg); }
+            50% { transform: rotateX(4deg) rotateY(8deg) rotateZ(1deg); }
+        }
+
+        @keyframes orbitSweep {
+            to { stroke-dashoffset: -42; }
+        }
+
+        .sidebar-shell {
+            background: linear-gradient(180deg, rgba(15, 23, 38, 0.985), rgba(8, 14, 27, 0.985));
+            box-shadow: 16px 0 40px rgba(0, 0, 0, 0.16);
+        }
+
+        .nav-item {
+            border: 1px solid transparent;
+            border-radius: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-item:hover {
+            background: rgba(30, 41, 59, 0.76);
+            border-color: rgba(71, 85, 105, 0.64);
+            transform: translateX(4px);
+        }
+
+        .nav-item-active {
+            background: linear-gradient(110deg, rgba(59, 130, 246, 0.22), rgba(34, 211, 238, 0.09));
+            border-color: rgba(96, 165, 250, 0.28);
+            box-shadow: inset 3px 0 0 #22D3EE, 0 10px 22px rgba(37, 99, 235, 0.11);
+        }
+
+        .nav-icon {
+            align-items: center;
+            background: rgba(51, 65, 85, 0.45);
+            border: 1px solid rgba(100, 116, 139, 0.36);
+            border-radius: 9px;
+            display: inline-flex;
+            font-size: 18px;
+            height: 30px;
+            justify-content: center;
+            transition: all 0.2s ease;
+            width: 30px;
+        }
+
+        .nav-item:hover .nav-icon,
+        .nav-item-active .nav-icon {
+            background: rgba(59, 130, 246, 0.16);
+            border-color: rgba(34, 211, 238, 0.35);
+            color: #22D3EE;
+        }
+
+        .stress-control {
+            background: linear-gradient(145deg, rgba(29, 45, 68, 0.92), rgba(17, 28, 45, 0.92));
+            border: 1px solid rgba(71, 85, 105, 0.72);
+            border-radius: 15px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.035);
+        }
+
+        .sidebar-action {
+            align-items: center;
+            background: linear-gradient(115deg, #2563EB, #3B82F6 52%, #22D3EE 150%);
+            border: 1px solid rgba(147, 197, 253, 0.56);
+            border-radius: 14px;
+            box-shadow: 0 12px 25px rgba(37, 99, 235, 0.26), inset 0 1px 0 rgba(255,255,255,0.28);
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            transition: all 0.22s ease;
+        }
+
+        .sidebar-action::before {
+            background: linear-gradient(110deg, transparent 25%, rgba(255,255,255,0.26) 50%, transparent 75%);
+            content: "";
+            height: 100%;
+            left: -120%;
+            position: absolute;
+            top: 0;
+            transition: left 0.55s ease;
+            width: 70%;
+        }
+
+        .sidebar-action:hover:not(:disabled) {
+            box-shadow: 0 17px 30px rgba(37, 99, 235, 0.40), inset 0 1px 0 rgba(255,255,255,0.32);
+            filter: brightness(1.08);
+            transform: translateY(-2px);
+        }
+
+        .sidebar-action:hover::before { left: 150%; }
+        .sidebar-action:disabled { cursor: wait; opacity: 0.75; }
+
+        .sidebar-action > * { position: relative; z-index: 1; }
+
+        .refresh-control {
+            align-items: center;
+            cursor: pointer;
+            display: inline-flex;
+            gap: 0.45rem;
+            transition: all 0.2s ease;
+        }
+
+        .refresh-control:hover {
+            background: rgba(34, 211, 238, 0.14);
+            border-color: rgba(34, 211, 238, 0.48);
+            transform: translateY(-1px);
+        }
+
+        .refresh-control.is-paused {
+            background: rgba(100, 116, 139, 0.12);
+            border-color: rgba(100, 116, 139, 0.36);
+            color: #94A3B8;
+        }
+
+        .mode-pill {
+            align-items: center;
+            background: rgba(52, 211, 153, 0.08);
+            border: 1px solid rgba(52, 211, 153, 0.24);
+            border-radius: 999px;
+            color: #A7F3D0;
+            display: inline-flex;
+            gap: 0.45rem;
+        }
+
+        .alert-trigger,
+        .alert-badge {
+            align-items: center;
+            border: 1px solid transparent;
+            display: inline-flex;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .alert-trigger {
+            border-radius: 12px;
+            cursor: pointer;
+            min-height: 36px;
+            padding: 0.45rem 0.6rem 0.45rem 0.7rem;
+        }
+
+        .alert-trigger:hover {
+            filter: brightness(1.12);
+            transform: translateY(-1px);
+        }
+
+        .alert-badge {
+            border-radius: 10px;
+            padding: 0.48rem 0.7rem;
+        }
+
+        .alert-count {
+            align-items: center;
+            background: rgba(2, 6, 23, 0.52);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 999px;
+            display: inline-flex;
+            font-size: 10px;
+            font-weight: 700;
+            height: 20px;
+            justify-content: center;
+            min-width: 20px;
+            padding: 0 0.3rem;
+        }
+
+        .alert-state-safe {
+            background: rgba(52, 211, 153, 0.10);
+            border-color: rgba(52, 211, 153, 0.30);
+            color: #6EE7B7;
+        }
+
+        .alert-state-warning {
+            background: rgba(251, 191, 36, 0.10);
+            border-color: rgba(251, 191, 36, 0.34);
+            color: #FCD34D;
+        }
+
+        .alert-state-critical {
+            background: rgba(251, 113, 133, 0.10);
+            border-color: rgba(251, 113, 133, 0.42);
+            color: #FDA4AF;
+        }
+
+        .alert-panel {
+            border-radius: 16px;
+            padding: 1.35rem;
+        }
+
+        .prism-scene { perspective: 900px; }
+        .prism-core {
+            animation: prismTurn 9s ease-in-out infinite;
+            transform-box: fill-box;
+            transform-origin: center;
+        }
+
+        .prism-orbit { animation: orbitSweep 7s linear infinite; }
+
+        .trust-core {
+            background: radial-gradient(circle at 30% 24%, rgba(34, 211, 238, 0.18), rgba(15, 23, 38, 0.98) 68%);
+            border-color: rgba(34, 211, 238, 0.42);
+            box-shadow: 0 0 0 8px rgba(34, 211, 238, 0.035), 0 16px 42px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.12);
+        }
+
+        .card-hover {
+            transition: all 0.25s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            border-color: #3B82F6;
+            box-shadow: 0 18px 38px rgba(59, 130, 246, 0.16);
+        }
+
+        #stressLevel {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+            height: 16px;
+            margin: 0;
+        }
+
+        #stressLevel::-webkit-slider-runnable-track {
+            background: linear-gradient(90deg, #3B82F6, #22D3EE);
+            border-radius: 999px;
+            height: 4px;
+        }
+
+        #stressLevel::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            background: #E0F2FE;
+            border: 2px solid #22D3EE;
+            border-radius: 50%;
+            box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.14), 0 2px 5px rgba(2, 6, 23, 0.65);
+            height: 12px;
+            margin-top: -4px;
+            transition: transform 0.16s ease, box-shadow 0.16s ease;
+            width: 12px;
+        }
+
+        #stressLevel::-webkit-slider-thumb:hover {
+            box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.20), 0 2px 7px rgba(2, 6, 23, 0.70);
+            transform: scale(1.10);
+        }
+
+        #stressLevel::-moz-range-track {
+            background: linear-gradient(90deg, #3B82F6, #22D3EE);
+            border-radius: 999px;
+            height: 4px;
+        }
+
+        #stressLevel::-moz-range-thumb {
+            background: #E0F2FE;
+            border: 2px solid #22D3EE;
+            border-radius: 50%;
+            box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.14), 0 2px 5px rgba(2, 6, 23, 0.65);
+            height: 10px;
+            width: 10px;
+        }
+    </style>
+</head>
+
+<body class="bg-background text-on-surface">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar-shell fixed left-0 top-0 h-screen w-64 border-r border-outline-variant hidden md:flex flex-col py-8 z-40">
+
+        <div class="px-6 mb-10">
+            <h1 class="text-2xl font-bold text-primary">
+                PRISM Intelligence
+            </h1>
+
+            <div class="flex items-center gap-2 mt-3 font-mono text-xs text-on-surface-variant">
+                <span class="w-2 h-2 rounded-full bg-warning pulse-dot"></span>
+                Vigilance Level: High
+            </div>
+        </div>
+
+        <ul class="flex flex-col gap-2 px-4 flex-grow">
+
+            <li>
+                <a href="#" id="dashboardBtn"
+                    class="nav-item nav-item-active flex items-center gap-3 px-4 py-3 text-primary font-semibold">
+
+                    <span class="nav-icon material-symbols-outlined">dashboard</span>
+                    Dashboard
+                </a>
+            </li>
+
+            <li>
+                <a href="#" id="adversarialBtn"
+                    class="nav-item flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary">
+
+                    <span class="nav-icon material-symbols-outlined">science</span>
+                    Adversarial Lab
+                </a>
+            </li>
+
+            <li>
+                <a href="#" id="analysisBtn"
+                    class="nav-item flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary">
+
+                    <span class="nav-icon material-symbols-outlined">analytics</span>
+                    Analysis
+                </a>
+            </li>
+
+            <li>
+                <a href="#" id="reportsBtn"
+                    class="nav-item flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary">
+
+                    <span class="nav-icon material-symbols-outlined">description</span>
+                    Reports
+                </a>
+            </li>
+
+            <li>
+                <a href="#" id="settingsBtn"
+                    class="nav-item flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-primary">
+
+                    <span class="nav-icon material-symbols-outlined">settings</span>
+                    System Settings
+                </a>
+            </li>
+
+        </ul>
+
+        <div class="px-6 space-y-3">
+            <div class="stress-control p-3">
+                <div class="flex justify-between font-mono text-[10px] text-on-surface-variant mb-2">
+                    <span>STRESS LEVEL</span>
+                    <span id="stressLevelValue" class="text-warning">1.5x</span>
+                </div>
+
+                <input
+                    id="stressLevel"
+                    type="range"
+                    min="0.2"
+                    max="2"
+                    step="0.1"
+                    value="1.5"
+                    class="w-full accent-blue-500"
+                >
+            </div>
+
+            <button id="stressTestBtn"
+                class="sidebar-action w-full gap-2 text-white font-mono text-xs font-bold py-3 uppercase tracking-wider">
+
+                <span class="material-symbols-outlined text-base">bolt</span>
+                <span>Run Stress Test</span>
+                <span class="material-symbols-outlined text-base opacity-80">arrow_forward</span>
+            </button>
+
+            <p class="text-center font-mono text-[9px] tracking-wide text-on-surface-variant">
+                SET INTENSITY, THEN RUN SIMULATION
+            </p>
+        </div>
+
+    </nav>
+
+
+    <!-- TOP BAR -->
+    <header class="fixed top-0 left-0 md:left-64 right-0 h-16 bg-surface border-b border-outline-variant z-30 flex items-center justify-between px-8">
+
+        <div class="flex items-center gap-3">
+            <h2 class="font-bold text-xl text-primary">
+                PRISM Risk Intel
+            </h2>
+
+            <div class="signal-pill hidden lg:flex items-center gap-2 px-3 py-1 font-mono text-[10px] text-cyan">
+                <span class="w-1.5 h-1.5 rounded-full bg-cyan pulse-dot"></span>
+                LIVE SIGNALS
+            </div>
+        </div>
+
+        <div class="flex items-center gap-6 font-mono text-xs">
+
+            <div class="hidden md:flex items-center gap-2 text-on-surface-variant">
+                <span class="w-2 h-2 rounded-full bg-success pulse-dot"></span>
+
+                Trust:
+                <span id="topTrustScore" class="text-on-surface">
+                    --
+                </span>
+            </div>
+
+            <div class="hidden md:flex items-center gap-2 text-on-surface-variant">
+                System:
+                <span id="topSystemStatus" class="text-success">
+                    Loading
+                </span>
+            </div>
+
+            <button id="alertCenterBtn" type="button" class="alert-trigger alert-state-warning font-mono text-[10px]" title="Open Alert Center">
+                <span id="alertCenterIcon" class="material-symbols-outlined text-base">notifications_active</span>
+                <span class="hidden lg:inline" id="alertCenterLabel">ALERT CENTER</span>
+                <span id="alertCount" class="alert-count">1</span>
+            </button>
+
+        </div>
+    </header>
+
+
+    <!-- MAIN -->
+    <main class="main-content p-6 md:p-8">
+
+        <div class="max-w-[1450px] mx-auto">
+
+            <!-- TITLE -->
+            <div class="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+
+                <div>
+                    <div class="font-mono text-xs tracking-widest text-on-surface-variant mb-3">
+                        PAYMENT AI INTELLIGENCE /
+                        <span class="text-primary">SYSTEM OBSERVATORY</span>
+                    </div>
+
+                    <h1 class="text-4xl md:text-5xl font-bold mb-3">
+                        Trust is more than accuracy.
+                    </h1>
+
+                    <p class="text-on-surface-variant text-lg">
+                        Reveal systemic AI failures before they become payment failures.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+                    <button id="autoRefreshToggle" type="button" class="refresh-control signal-pill px-3 py-2 text-cyan" aria-pressed="true" title="Pause or resume automatic dashboard updates">
+                        <span id="refreshDot" class="w-1.5 h-1.5 rounded-full bg-cyan pulse-dot"></span>
+                        <span id="autoRefreshLabel">AUTO-REFRESH: ON</span>
+                        <span id="refreshDetail" class="text-on-surface-variant">30s</span>
+                    </button>
+                    <div class="mode-pill px-3 py-2" title="The dashboard is currently receiving live data from the backend">
+                        <span class="material-symbols-outlined text-sm">sensors</span>
+                        <span id="modeLabel">LIVE MONITORING</span>
+                    </div>
+                    <span id="lastRefreshTime" class="hidden xl:inline text-[10px] text-on-surface-variant">UPDATED: --</span>
+                </div>
+
+            </div>
+
+
+            <!-- MAIN GRID -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- PRISM TRUST FIELD -->
+                <div class="lg:col-span-8 glass-panel p-6 min-h-[510px] relative overflow-hidden">
+
+                    <div class="flex justify-between items-center">
+
+                        <h2 class="font-mono text-xs tracking-widest text-on-surface-variant">
+                            PRISM TRUST FIELD
+                        </h2>
+
+                        <div id="trustFieldAlert" class="alert-badge alert-state-warning">
+
+                            <span id="trustFieldAlertDot" class="w-2 h-2 rounded-full bg-warning pulse-dot"></span>
+
+                            <span id="trustFieldAlertLabel" class="font-mono text-[10px] font-bold">
+                                RISK EVALUATING
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="prism-scene relative h-[400px] flex items-center justify-center">
+
+                        <!-- 3D TRUST PYRAMID -->
+                        <svg class="w-full max-w-[330px] prism-float"
+                            viewBox="0 0 400 400">
+
+                            <defs>
+                                <linearGradient id="prism-left" x1="0" y1="0" x2="1" y2="1">
+                                    <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.82" />
+                                    <stop offset="100%" stop-color="#155E75" stop-opacity="0.22" />
+                                </linearGradient>
+                                <linearGradient id="prism-right" x1="1" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.82" />
+                                    <stop offset="100%" stop-color="#1E3A8A" stop-opacity="0.24" />
+                                </linearGradient>
+                                <linearGradient id="prism-top" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stop-color="#E0F2FE" stop-opacity="0.62" />
+                                    <stop offset="100%" stop-color="#0EA5E9" stop-opacity="0.18" />
+                                </linearGradient>
+                                <linearGradient id="prism-base" x1="0" y1="0" x2="1" y2="0">
+                                    <stop offset="0%" stop-color="#0E7490" stop-opacity="0.44" />
+                                    <stop offset="100%" stop-color="#7C3AED" stop-opacity="0.58" />
+                                </linearGradient>
+                                <filter id="prism-glow" x="-60%" y="-60%" width="220%" height="220%">
+                                    <feGaussianBlur stdDeviation="10" result="blur" />
+                                    <feMerge>
+                                        <feMergeNode in="blur" />
+                                        <feMergeNode in="SourceGraphic" />
+                                    </feMerge>
+                                </filter>
+                                <filter id="soft-shadow" x="-50%" y="-50%" width="200%" height="200%">
+                                    <feDropShadow dx="0" dy="15" stdDeviation="12" flood-color="#020617" flood-opacity="0.72" />
+                                </filter>
+                                <radialGradient id="core-glow">
+                                    <stop offset="0%" stop-color="#E0F2FE" stop-opacity="0.92" />
+                                    <stop offset="30%" stop-color="#22D3EE" stop-opacity="0.62" />
+                                    <stop offset="100%" stop-color="#22D3EE" stop-opacity="0" />
+                                </radialGradient>
+                            </defs>
+
+                            <circle cx="200" cy="205" r="158" fill="none" stroke="#334155" stroke-dasharray="5 8" opacity="0.72" />
+                            <circle class="prism-orbit" cx="200" cy="205" r="123" fill="none" stroke="#22D3EE" stroke-opacity="0.30" stroke-width="1.5" stroke-dasharray="18 24" />
+                            <ellipse cx="200" cy="271" rx="132" ry="27" fill="#020617" opacity="0.48" />
+
+                            <g class="prism-core" filter="url(#soft-shadow)">
+                                <polygon points="200,78 98,260 200,312" fill="url(#prism-left)" stroke="#67E8F9" stroke-opacity="0.84" stroke-width="1.4" />
+                                <polygon points="200,78 302,260 200,312" fill="url(#prism-right)" stroke="#C4B5FD" stroke-opacity="0.84" stroke-width="1.4" />
+                                <polygon points="200,78 302,260 98,260" fill="url(#prism-top)" stroke="#BAE6FD" stroke-opacity="0.62" stroke-width="1.1" />
+                                <polygon points="98,260 302,260 200,312" fill="url(#prism-base)" stroke="#22D3EE" stroke-opacity="0.62" stroke-width="1.1" />
+                                <path d="M200 78 L200 312 M98 260 L302 260" stroke="#E0F2FE" stroke-opacity="0.34" stroke-width="1" />
+                                <circle cx="200" cy="201" r="48" fill="url(#core-glow)" filter="url(#prism-glow)" />
+                                <circle cx="200" cy="201" r="4.5" fill="#E0F2FE" />
+                                <circle cx="200" cy="78" r="4.5" fill="#67E8F9" />
+                                <circle cx="98" cy="260" r="4.5" fill="#FBBF24" />
+                                <circle cx="302" cy="260" r="4.5" fill="#C4B5FD" />
+                            </g>
+
+                            <g fill="#22D3EE" opacity="0.75">
+                                <circle cx="74" cy="154" r="2" />
+                                <circle cx="323" cy="129" r="2" />
+                                <circle cx="320" cy="299" r="1.6" />
+                                <circle cx="86" cy="318" r="1.6" />
+                            </g>
+
+                        </svg>
+
+
+                        <!-- TOP PERFORMANCE -->
+                        <div class="absolute top-5 text-center">
+
+                            <div class="font-mono text-[10px] text-on-surface-variant">
+                                MODEL PERFORMANCE
+                            </div>
+
+                            <div id="performanceValue"
+                                class="font-mono text-lg text-cyan mt-1">
+                                --
+                            </div>
+
+                        </div>
+
+
+                        <!-- LEFT INDEPENDENCE -->
+                        <div class="absolute left-4 bottom-12">
+
+                            <div class="font-mono text-[10px] text-warning">
+                                SYSTEMIC INDEPENDENCE
+                            </div>
+
+                            <div id="independenceValue"
+                                class="font-mono text-lg text-warning mt-1">
+                                --
+                            </div>
+
+                        </div>
+
+
+                        <!-- RIGHT CONFIDENCE -->
+                        <div class="absolute right-4 bottom-12 text-right">
+
+                            <div class="font-mono text-[10px] text-on-surface-variant">
+                                CONFIDENCE CALIBRATION
+                            </div>
+
+                            <div id="calibrationValue"
+                                class="font-mono text-lg text-cyan mt-1">
+                                --
+                            </div>
+
+                        </div>
+
+
+                        <!-- CENTER TRUST -->
+                        <div class="trust-core absolute w-28 h-28 rounded-full border flex flex-col justify-center items-center">
+
+                            <div id="trustScoreValue"
+                                class="font-mono text-2xl font-bold text-cyan">
+                                --
+                            </div>
+
+                            <div class="font-mono text-[9px] text-on-surface-variant mt-2">
+                                SYSTEM TRUST
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- LIVE TELEMETRY -->
+                <div class="lg:col-span-4">
+
+                    <div class="glass-panel p-6 h-full">
+
+                        <h2 class="font-mono text-xs tracking-widest text-on-surface-variant border-b border-outline-variant pb-4">
+                            LIVE TELEMETRY
+                        </h2>
+
+
+                        <div class="space-y-8 mt-8">
+
+                            <div class="telemetry-row flex justify-between items-center">
+
+                                <div>
+
+                                    <div class="font-mono text-[10px] text-on-surface-variant">
+                                        TRANSACTIONS
+                                    </div>
+
+                                    <div id="transactionsValue"
+                                        class="font-mono text-2xl mt-2">
+                                        --
+                                    </div>
+
+                                </div>
+
+                                <span class="material-symbols-outlined text-cyan text-3xl">
+                                    payments
+                                </span>
+
+                            </div>
+
+
+                            <div class="telemetry-row flex justify-between items-center">
+
+                                <div>
+
+                                    <div class="font-mono text-[10px] text-warning">
+                                        CORRELATED RISK
+                                    </div>
+
+                                    <div id="riskValue"
+                                        class="font-mono text-2xl text-warning mt-2">
+                                        --
+                                    </div>
+
+                                </div>
+
+                                <span class="material-symbols-outlined text-warning text-3xl">
+                                    warning
+                                </span>
+
+                            </div>
+
+
+                            <div class="telemetry-row flex justify-between items-center">
+
+                                <div>
+
+                                    <div class="font-mono text-[10px] text-on-surface-variant">
+                                        AVG CONFIDENCE
+                                    </div>
+
+                                    <div id="confidenceValue"
+                                        class="font-mono text-2xl text-success mt-2">
+                                        --
+                                    </div>
+
+                                </div>
+
+                                <span class="material-symbols-outlined text-success text-3xl">
+                                    verified
+                                </span>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="mt-10 bg-surface-container-high border-l-2 border-warning p-5 rounded-lg">
+
+                            <div class="font-mono text-xs text-warning font-bold mb-2">
+                                AI INSIGHT
+                            </div>
+
+                            <p class="text-sm text-on-surface-variant leading-relaxed">
+                                Individual models appear healthy. PRISM monitors whether their failures become correlated.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- TRUST TRAJECTORY -->
+            <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+
+                <div class="lg:col-span-8 glass-panel p-6 relative overflow-hidden">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
+                        <div>
+                            <div class="font-mono text-xs tracking-widest text-on-surface-variant">
+                                TRUST TRAJECTORY
+                            </div>
+                            <h2 class="text-2xl font-bold mt-2">
+                                Resilience under operational stress
+                            </h2>
+                            <p class="text-sm text-on-surface-variant mt-2">
+                                Each point comes from the live trust-history simulation.
+                            </p>
+                        </div>
+
+                        <div class="signal-pill self-start flex items-center gap-2 px-3 py-2 font-mono text-[10px] text-cyan">
+                            <span class="w-1.5 h-1.5 rounded-full bg-cyan pulse-dot"></span>
+                            <span id="trajectoryStatus">SYNCING DATA</span>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-outline-variant bg-[#09111f]/70 p-3 sm:p-5">
+                        <svg id="trajectoryChart" class="w-full h-auto" viewBox="0 0 720 270" role="img" aria-label="Trust score by stress level">
+                            <defs>
+                                <linearGradient id="trustGradient" x1="0" x2="1" y1="0" y2="0">
+                                    <stop offset="0%" stop-color="#22D3EE" />
+                                    <stop offset="100%" stop-color="#8B5CF6" />
+                                </linearGradient>
+                                <linearGradient id="trustAreaGradient" x1="0" x2="0" y1="0" y2="1">
+                                    <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.30" />
+                                    <stop offset="100%" stop-color="#22D3EE" stop-opacity="0" />
+                                </linearGradient>
+                            </defs>
+
+                            <line class="chart-grid-line" x1="48" x2="700" y1="32" y2="32" />
+                            <line class="chart-grid-line" x1="48" x2="700" y1="80" y2="80" />
+                            <line class="chart-grid-line" x1="48" x2="700" y1="128" y2="128" />
+                            <line class="chart-grid-line" x1="48" x2="700" y1="176" y2="176" />
+                            <line class="chart-grid-line" x1="48" x2="700" y1="224" y2="224" />
+
+                            <text class="chart-label" x="18" y="35">100</text>
+                            <text class="chart-label" x="24" y="83">75</text>
+                            <text class="chart-label" x="24" y="131">50</text>
+                            <text class="chart-label" x="24" y="179">25</text>
+                            <text class="chart-label" x="30" y="227">0</text>
+
+                            <polygon id="trajectoryArea" points="" fill="url(#trustAreaGradient)" />
+                            <polyline id="trajectoryLine" points="" fill="none" stroke="url(#trustGradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                            <g id="trajectoryPoints"></g>
+
+                            <text class="chart-label" x="48" y="254">LOW STRESS</text>
+                            <text class="chart-label" x="618" y="254">HIGH STRESS</text>
+                        </svg>
+
+                        <div id="trajectoryEmpty" class="hidden py-10 text-center font-mono text-xs text-on-surface-variant">
+                            Waiting for trust-history data…
+                        </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-x-6 gap-y-2 mt-5 font-mono text-[10px] text-on-surface-variant">
+                        <span class="flex items-center gap-2"><span class="w-5 h-0.5 bg-cyan"></span> TRUST SCORE</span>
+                        <span>Y-AXIS: SCORE / 100</span>
+                        <span>X-AXIS: STRESS LEVEL</span>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-4 glass-panel p-6 flex flex-col">
+                    <div class="font-mono text-xs tracking-widest text-on-surface-variant">
+                        PRISM DECISION PATH
+                    </div>
+
+                    <h2 class="text-2xl font-bold mt-2">
+                        From signal to action
+                    </h2>
+
+                    <div class="space-y-4 mt-7">
+                        <div class="flex gap-4">
+                            <div class="w-8 h-8 shrink-0 rounded-lg bg-primary/15 text-primary flex items-center justify-center font-mono text-xs">01</div>
+                            <div>
+                                <div class="font-semibold">Observe</div>
+                                <p class="text-sm text-on-surface-variant mt-1">Track trust, calibration, and model independence together.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="w-8 h-8 shrink-0 rounded-lg bg-warning/15 text-warning flex items-center justify-center font-mono text-xs">02</div>
+                            <div>
+                                <div class="font-semibold">Stress test</div>
+                                <p class="text-sm text-on-surface-variant mt-1">Simulate difficult conditions with the stress-level control.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="w-8 h-8 shrink-0 rounded-lg bg-critical/15 text-critical flex items-center justify-center font-mono text-xs">03</div>
+                            <div>
+                                <div class="font-semibold">Intervene</div>
+                                <p id="trajectoryNarrative" class="text-sm text-on-surface-variant mt-1">PRISM will surface the highest-risk pattern and a recommended response.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto pt-6">
+                        <div class="rounded-xl border border-critical/25 bg-critical/5 p-4">
+                            <div class="font-mono text-[10px] text-critical">CURRENT SIGNAL</div>
+                            <div id="trajectoryRisk" class="font-mono text-2xl text-critical mt-2">--</div>
+                            <div class="text-xs text-on-surface-variant mt-1">Highest correlated risk in the current run</div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+
+            <!-- BOTTOM CARDS -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+
+                <div class="glass-panel card-hover p-6">
+
+                    <span class="material-symbols-outlined text-primary text-3xl">
+                        psychology
+                    </span>
+
+                    <h3 class="font-bold text-lg mt-4">
+                        Systemic Trust
+                    </h3>
+
+                    <p class="text-sm text-on-surface-variant mt-2">
+                        Measures trust beyond isolated model accuracy.
+                    </p>
+
+                </div>
+
+
+                <div class="glass-panel card-hover p-6">
+
+                    <span class="material-symbols-outlined text-warning text-3xl">
+                        hub
+                    </span>
+
+                    <h3 class="font-bold text-lg mt-4">
+                        Failure Correlation
+                    </h3>
+
+                    <p class="text-sm text-on-surface-variant mt-2">
+                        Detects when independent AI systems fail together.
+                    </p>
+
+                </div>
+
+
+                <div class="glass-panel card-hover p-6">
+
+                    <span class="material-symbols-outlined text-critical text-3xl">
+                        science
+                    </span>
+
+                    <h3 class="font-bold text-lg mt-4">
+                        AI Red Team
+                    </h3>
+
+                    <p class="text-sm text-on-surface-variant mt-2">
+                        Explores adversarial conditions and worst-case scenarios.
+                    </p>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+    <!-- JAVASCRIPT -->
+    <script>
+
+        const API_BASE = "http://127.0.0.1:8000";
+        const AUTO_REFRESH_INTERVAL = 30000;
+
+        let autoRefreshTimer = null;
+        let autoRefreshEnabled = true;
+        let alertSourceType = "live";
+        let lastStressResult = null;
+        let currentAlert = {
+            state: "safe",
+            level: "SAFE",
+            risk: 0,
+            source: "Awaiting live data",
+            title: "No systemic alert",
+            message: "Correlation risk is within the safe operating range.",
+            action: "Continue live monitoring."
+        };
+
+
+        function $(id) {
+            return document.getElementById(id);
+        }
+
+
+        function safeText(id, value) {
+            const element = $(id);
+
+            if (element) {
+                element.textContent = value;
+            }
+        }
+
+
+        function asNumber(value) {
+            const number = Number(value);
+
+            return Number.isFinite(number) ? number : null;
+        }
+
+
+        function formatNumber(value, decimals = 2) {
+            const number = asNumber(value);
+
+            return number === null ? "--" : number.toFixed(decimals);
+        }
+
+
+        function formatPercent(value, decimals = 2) {
+            const number = asNumber(value);
+
+            if (number === null) {
+                return "--";
+            }
+
+            // Supports APIs that return either 0.94 or 94 for a percentage.
+            const percentage = Math.abs(number) <= 1 ? number * 100 : number;
+
+            return percentage.toFixed(decimals) + "%";
+        }
+
+
+        function average(values) {
+            const validValues = values
+                .map(asNumber)
+                .filter((value) => value !== null);
+
+            if (!validValues.length) {
+                return null;
+            }
+
+            return validValues.reduce(
+                (total, value) => total + value,
+                0
+            ) / validValues.length;
+        }
+
+
+        function escapeHtml(value) {
+            return String(value ?? "--").replace(
+                /[&<>"']/g,
+                (character) => ({
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    "\"": "&quot;",
+                    "'": "&#039;"
+                })[character]
+            );
+        }
+
+
+        function toRiskPercent(value) {
+            const risk = asNumber(value);
+
+            if (risk === null) {
+                return 0;
+            }
+
+            const percentage = Math.abs(risk) <= 1 ? risk * 100 : risk;
+
+            return Math.max(0, Math.min(100, percentage));
+        }
+
+
+        function buildAlert(riskValue, source = "Live dashboard") {
+            const risk = toRiskPercent(riskValue);
+
+            if (risk >= 35) {
+                return {
+                    state: "critical",
+                    level: "CRITICAL",
+                    risk,
+                    source,
+                    title: "Shared failure conditions detected",
+                    message: "Multiple models may fail together under the current operating conditions.",
+                    action: "Open an incident review and pause automated approval escalation."
+                };
+            }
+
+            if (risk >= 20) {
+                return {
+                    state: "warning",
+                    level: "WARNING",
+                    risk,
+                    source,
+                    title: "Correlation risk requires review",
+                    message: "Failure patterns are becoming more aligned across the model ensemble.",
+                    action: "Review shared model features and validate the next high-risk batch."
+                };
+            }
+
+            return {
+                state: "safe",
+                level: "SAFE",
+                risk,
+                source,
+                title: "Systemic risk is controlled",
+                message: "Models are operating with acceptable independence at the current stress level.",
+                action: "Continue live monitoring."
+            };
+        }
+
+
+        function applyAlertState(element, state) {
+            if (!element) {
+                return;
+            }
+
+            element.classList.remove(
+                "alert-state-safe",
+                "alert-state-warning",
+                "alert-state-critical"
+            );
+
+            element.classList.add(`alert-state-${state}`);
+        }
+
+
+        function updateAlertCenter(riskValue, source, sourceType = "live") {
+            // A completed stress test has priority over background dashboard polls.
+            if (alertSourceType === "stress" && sourceType === "live") {
+                return;
+            }
+
+            alertSourceType = sourceType;
+            currentAlert = buildAlert(riskValue, source);
+
+            const alertButton = $("alertCenterBtn");
+            const alertDot = $("trustFieldAlertDot");
+            const alertIcon = $("alertCenterIcon");
+
+            applyAlertState(alertButton, currentAlert.state);
+            applyAlertState($("trustFieldAlert"), currentAlert.state);
+
+            safeText("alertCount", currentAlert.state === "safe" ? "0" : "1");
+            safeText("alertCenterLabel", `${currentAlert.level} ALERT`);
+            safeText("trustFieldAlertLabel", `${currentAlert.level} / ${currentAlert.risk.toFixed(1)}% RISK`);
+
+            if (alertButton) {
+                alertButton.title = `${currentAlert.level}: ${currentAlert.title}. Open Alert Center.`;
+            }
+
+            if (alertIcon) {
+                alertIcon.textContent = currentAlert.state === "safe"
+                    ? "verified"
+                    : currentAlert.state === "critical"
+                        ? "warning"
+                        : "notifications_active";
+            }
+
+            if (alertDot) {
+                alertDot.classList.toggle("pulse-dot", currentAlert.state !== "safe");
+                alertDot.style.backgroundColor = currentAlert.state === "critical"
+                    ? "#FB7185"
+                    : currentAlert.state === "warning"
+                        ? "#FBBF24"
+                        : "#34D399";
+            }
+        }
+
+
+        function openAlertCenter() {
+            const alert = currentAlert;
+            const icon = alert.state === "safe"
+                ? "verified"
+                : alert.state === "critical"
+                    ? "warning"
+                    : "notifications_active";
+
+            const modal = openModal(
+                "Alert Center",
+                `
+                <div class="alert-panel alert-state-${alert.state}">
+                    <div class="flex items-start gap-4">
+                        <span class="material-symbols-outlined text-3xl">${icon}</span>
+                        <div>
+                            <div class="font-mono text-xs tracking-widest">${alert.level} SEVERITY</div>
+                            <h3 class="text-xl font-bold mt-2 text-on-surface">${alert.title}</h3>
+                            <p class="text-on-surface-variant mt-2">${alert.message}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
+                    <div class="p-4 bg-surface-container-high rounded-xl border border-outline-variant">
+                        <div class="font-mono text-[10px] text-on-surface-variant">CURRENT RISK</div>
+                        <div class="font-mono text-2xl text-on-surface mt-2">${alert.risk.toFixed(2)}%</div>
+                    </div>
+                    <div class="p-4 bg-surface-container-high rounded-xl border border-outline-variant">
+                        <div class="font-mono text-[10px] text-on-surface-variant">ALERT SOURCE</div>
+                        <div class="font-mono text-sm text-on-surface mt-2">${escapeHtml(alert.source)}</div>
+                    </div>
+                    <div class="p-4 bg-surface-container-high rounded-xl border border-outline-variant">
+                        <div class="font-mono text-[10px] text-on-surface-variant">NEXT ACTION</div>
+                        <div class="font-mono text-sm text-cyan mt-2">${escapeHtml(alert.action)}</div>
+                    </div>
+                </div>
+
+                <div class="mt-5 rounded-xl border border-outline-variant overflow-hidden">
+                    <div class="grid grid-cols-3 bg-surface-container-high px-4 py-3 font-mono text-[10px] text-on-surface-variant">
+                        <span>SAFE</span><span>WARNING</span><span>CRITICAL</span>
+                    </div>
+                    <div class="grid grid-cols-3 px-4 py-3 font-mono text-sm">
+                        <span class="text-success">Below 20%</span><span class="text-warning">20% – 35%</span><span class="text-critical">35% and above</span>
+                    </div>
+                </div>
+
+                <div class="mt-5 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between rounded-xl border border-primary/25 bg-primary/5 p-4">
+                    <div>
+                        <div class="font-mono text-xs text-primary">INCIDENT REPORT</div>
+                        <p class="mt-1 text-sm text-on-surface-variant">Download a printable record or save it as a PDF.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="downloadIncidentReportBtn" class="inline-flex items-center gap-2 rounded-lg border border-outline-variant bg-surface px-3 py-2 font-mono text-[10px] font-bold text-on-surface transition hover:border-primary hover:text-primary">
+                            <span class="material-symbols-outlined text-base">download</span>
+                            DOWNLOAD
+                        </button>
+                        <button id="printIncidentReportBtn" class="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 font-mono text-[10px] font-bold text-white transition hover:bg-blue-600">
+                            <span class="material-symbols-outlined text-base">picture_as_pdf</span>
+                            SAVE PDF
+                        </button>
+                    </div>
+                </div>
+                `
+            );
+
+            modal.querySelector("#downloadIncidentReportBtn")
+                ?.addEventListener("click", downloadIncidentReport);
+
+            modal.querySelector("#printIncidentReportBtn")
+                ?.addEventListener("click", printIncidentReport);
+        }
+
+
+        function getIncidentReportData() {
+            const source = lastStressResult || {};
+
+            return {
+                reportId: `PRISM-${Date.now().toString().slice(-6)}`,
+                generatedAt: new Intl.DateTimeFormat(
+                    [],
+                    { dateStyle: "medium", timeStyle: "medium" }
+                ).format(new Date()),
+                stressLevel: asNumber(source.stress_level),
+                trustScore: asNumber(source.trust_score),
+                performance: asNumber(source.performance),
+                calibration: asNumber(source.calibration),
+                correlation: asNumber(source.correlation),
+                risk: currentAlert.risk,
+                severity: currentAlert.level,
+                source: currentAlert.source,
+                title: currentAlert.title,
+                message: currentAlert.message,
+                action: currentAlert.action
+            };
+        }
+
+
+        function buildIncidentReportHtml() {
+            const report = getIncidentReportData();
+            const metric = (value, suffix = "") =>
+                value === null ? "Not available" : `${value.toFixed(2)}${suffix}`;
+            const percentageMetric = (value) => {
+                if (value === null) {
+                    return "Not available";
+                }
+
+                const percentage = Math.abs(value) <= 1 ? value * 100 : value;
+
+                return `${percentage.toFixed(2)}%`;
+            };
+
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${report.reportId} Incident Report</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { background: #f8fafc; color: #0f172a; font-family: Arial, sans-serif; margin: 0; padding: 36px; }
+        .report { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 18px; margin: auto; max-width: 860px; overflow: hidden; }
+        header { background: #0f172a; color: #f8fafc; padding: 30px 36px; }
+        .brand { color: #38bdf8; font-family: monospace; font-size: 12px; letter-spacing: 0.16em; }
+        h1 { font-size: 30px; margin: 10px 0 0; }
+        .meta { color: #94a3b8; font-size: 13px; margin-top: 10px; }
+        main { padding: 30px 36px 36px; }
+        .severity { border: 1px solid #fb7185; border-radius: 14px; color: #be123c; background: #fff1f2; padding: 18px; }
+        .severity.safe { border-color: #34d399; color: #047857; background: #ecfdf5; }
+        .severity.warning { border-color: #fbbf24; color: #a16207; background: #fffbeb; }
+        .eyebrow { font-family: monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+        h2 { font-size: 22px; margin: 8px 0; }
+        p { color: #475569; line-height: 1.6; margin: 8px 0; }
+        .metrics { display: grid; gap: 14px; grid-template-columns: repeat(3, 1fr); margin-top: 22px; }
+        .metric { border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px; }
+        .metric-label { color: #64748b; font-family: monospace; font-size: 11px; }
+        .metric-value { color: #0f172a; font-family: monospace; font-size: 24px; font-weight: 700; margin-top: 8px; }
+        .action { background: #eff6ff; border-left: 4px solid #2563eb; border-radius: 8px; margin-top: 22px; padding: 16px; }
+        footer { border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px; padding: 18px 36px; }
+        @media print { body { background: #fff; padding: 0; } .report { border: 0; border-radius: 0; } }
+        @media (max-width: 600px) { .metrics { grid-template-columns: 1fr; } body { padding: 12px; } header, main { padding: 24px; } }
+    </style>
+</head>
+<body>
+    <article class="report">
+        <header>
+            <div class="brand">PRISM INTELLIGENCE</div>
+            <h1>AI Risk Incident Report</h1>
+            <div class="meta">${report.reportId} &nbsp;•&nbsp; Generated ${report.generatedAt}</div>
+        </header>
+        <main>
+            <section class="severity ${report.severity.toLowerCase()}">
+                <div class="eyebrow">${report.severity} SEVERITY</div>
+                <h2>${escapeHtml(report.title)}</h2>
+                <p>${escapeHtml(report.message)}</p>
+            </section>
+            <section class="metrics">
+                <div class="metric"><div class="metric-label">CORRELATION RISK</div><div class="metric-value">${report.risk.toFixed(2)}%</div></div>
+                <div class="metric"><div class="metric-label">STRESS LEVEL</div><div class="metric-value">${metric(report.stressLevel, "x")}</div></div>
+                <div class="metric"><div class="metric-label">TRUST SCORE</div><div class="metric-value">${metric(report.trustScore)}</div></div>
+                <div class="metric"><div class="metric-label">PERFORMANCE</div><div class="metric-value">${percentageMetric(report.performance)}</div></div>
+                <div class="metric"><div class="metric-label">CALIBRATION</div><div class="metric-value">${metric(report.calibration)}</div></div>
+                <div class="metric"><div class="metric-label">CORRELATION</div><div class="metric-value">${metric(report.correlation)}</div></div>
+            </section>
+            <section class="action">
+                <div class="eyebrow">RECOMMENDED ACTION</div>
+                <p>${escapeHtml(report.action)}</p>
+                <p><strong>Source:</strong> ${escapeHtml(report.source)}</p>
+            </section>
+        </main>
+        <footer>Generated by PRISM Intelligence • System Observatory</footer>
+    </article>
+</body>
+</html>`;
+        }
+
+
+        function downloadIncidentReport() {
+            const blob = new Blob([buildIncidentReportHtml()], { type: "text/html" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+
+            link.href = url;
+            link.download = `prism-incident-report-${Date.now()}.html`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+
+        function printIncidentReport() {
+            const reportWindow = window.open("", "_blank");
+
+            if (!reportWindow) {
+                alert("Please allow pop-ups to save the incident report as PDF.");
+                return;
+            }
+
+            reportWindow.opener = null;
+            reportWindow.document.open();
+            reportWindow.document.write(buildIncidentReportHtml());
+            reportWindow.document.close();
+            reportWindow.focus();
+            setTimeout(() => reportWindow.print(), 300);
+        }
+
+
+        function updateRefreshTimestamp() {
+            const time = new Intl.DateTimeFormat(
+                [],
+                { hour: "2-digit", minute: "2-digit", second: "2-digit" }
+            ).format(new Date());
+
+            safeText("lastRefreshTime", `UPDATED: ${time}`);
+        }
+
+
+        async function refreshDashboardData() {
+            const [dashboardLoaded, historyLoaded] = await Promise.all([
+                loadDashboard(),
+                loadTrustTrajectory()
+            ]);
+
+            if (dashboardLoaded || historyLoaded) {
+                updateRefreshTimestamp();
+            } else {
+                safeText("lastRefreshTime", "SYNC FAILED");
+            }
+        }
+
+
+        function updateRefreshControl() {
+            const toggle = $("autoRefreshToggle");
+            const refreshDot = $("refreshDot");
+
+            safeText(
+                "autoRefreshLabel",
+                autoRefreshEnabled ? "AUTO-REFRESH: ON" : "AUTO-REFRESH: OFF"
+            );
+
+            safeText(
+                "refreshDetail",
+                autoRefreshEnabled ? "30s" : "PAUSED"
+            );
+
+            safeText(
+                "modeLabel",
+                autoRefreshEnabled ? "LIVE MONITORING" : "MANUAL REFRESH"
+            );
+
+            if (toggle) {
+                toggle.classList.toggle("is-paused", !autoRefreshEnabled);
+                toggle.setAttribute("aria-pressed", String(autoRefreshEnabled));
+                toggle.title = autoRefreshEnabled
+                    ? "Pause automatic dashboard updates"
+                    : "Resume automatic dashboard updates";
+            }
+
+            if (refreshDot) {
+                refreshDot.classList.toggle("pulse-dot", autoRefreshEnabled);
+                refreshDot.classList.toggle("bg-cyan", autoRefreshEnabled);
+                refreshDot.classList.toggle("bg-warning", !autoRefreshEnabled);
+            }
+        }
+
+
+        function setAutoRefresh(enabled) {
+            autoRefreshEnabled = enabled;
+
+            if (autoRefreshTimer) {
+                clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+            }
+
+            if (autoRefreshEnabled) {
+                autoRefreshTimer = setInterval(
+                    refreshDashboardData,
+                    AUTO_REFRESH_INTERVAL
+                );
+            }
+
+            updateRefreshControl();
+        }
+
+
+        /* =========================
+           DASHBOARD
+        ========================= */
+
+        async function loadDashboard() {
+
+            try {
+
+                const response = await fetch(
+                    `${API_BASE}/dashboard`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Dashboard API unavailable");
+                }
+
+                const data = await response.json();
+
+                console.log("Dashboard Data:", data);
+
+
+                safeText(
+                    "trustScoreValue",
+                    formatNumber(data.trust_score)
+                );
+
+                safeText(
+                    "topTrustScore",
+                    formatNumber(data.trust_score)
+                );
+
+                safeText(
+                    "topSystemStatus",
+                    data.trust_level || "Monitoring"
+                );
+
+                const transactions = asNumber(data.total_transactions);
+
+                safeText(
+                    "transactionsValue",
+                    transactions === null
+                        ? "--"
+                        : transactions.toLocaleString()
+                );
+
+                safeText(
+                    "riskValue",
+                    formatPercent(data.correlated_failure_rate)
+                );
+
+                updateAlertCenter(
+                    data.correlated_failure_rate,
+                    "Live dashboard",
+                    "live"
+                );
+
+                const models =
+                    Object.values(data.model_metrics || {});
+
+                const avgAccuracy = average(
+                    models.map((model) => model?.accuracy)
+                );
+
+                safeText(
+                    "performanceValue",
+                    formatPercent(avgAccuracy)
+                );
+
+                const calibrationModels =
+                    Object.values(data.calibration || {});
+
+                const avgConfidence = average(
+                    calibrationModels.map(
+                        (model) => model?.average_confidence
+                    )
+                );
+
+
+                safeText(
+                    "confidenceValue",
+                    formatPercent(avgConfidence)
+                );
+
+                safeText(
+                    "calibrationValue",
+                    formatPercent(avgConfidence)
+                );
+
+                const risk = asNumber(data.correlated_failure_rate);
+
+                const independence =
+                    risk === null
+                        ? null
+                        : Math.max(0, 100 - risk * 2);
+
+                safeText(
+                    "independenceValue",
+                    formatPercent(independence)
+                );
+
+
+                console.log(
+                    "Dashboard UI updated successfully!"
+                );
+
+                return true;
+
+            }
+
+            catch (error) {
+
+                console.error(
+                    "Dashboard error:",
+                    error
+                );
+
+                safeText(
+                    "topSystemStatus",
+                    "API Offline"
+                );
+
+                return false;
+
+            }
+
+        }
+
+
+        /* =========================
+           TRUST TRAJECTORY
+        ========================= */
+
+        function getHistoryItems(data) {
+            const history = Array.isArray(data)
+                ? data
+                : Array.isArray(data?.history)
+                    ? data.history
+                    : [];
+
+            return history
+                .filter((item) =>
+                    asNumber(item?.stress_level) !== null &&
+                    asNumber(item?.trust_score) !== null
+                )
+                .sort(
+                    (a, b) =>
+                        asNumber(a.stress_level) -
+                        asNumber(b.stress_level)
+                );
+        }
+
+
+        function renderTrustTrajectory(history) {
+            const chart = $("trajectoryChart");
+            const line = $("trajectoryLine");
+            const area = $("trajectoryArea");
+            const pointsGroup = $("trajectoryPoints");
+            const emptyState = $("trajectoryEmpty");
+            const status = $("trajectoryStatus");
+            const risk = $("trajectoryRisk");
+            const narrative = $("trajectoryNarrative");
+
+            if (!chart || !line || !area || !pointsGroup) {
+                return;
+            }
+
+            if (!history.length) {
+                chart.classList.add("hidden");
+                emptyState?.classList.remove("hidden");
+                safeText("trajectoryStatus", "NO DATA");
+                safeText("trajectoryRisk", "--");
+
+                return;
+            }
+
+            chart.classList.remove("hidden");
+            emptyState?.classList.add("hidden");
+
+            const left = 48;
+            const right = 700;
+            const top = 32;
+            const bottom = 224;
+            const width = right - left;
+            const height = bottom - top;
+
+            const points = history.map((item, index) => {
+                const trust = Math.max(
+                    0,
+                    Math.min(100, asNumber(item.trust_score))
+                );
+
+                const x = history.length === 1
+                    ? left + width / 2
+                    : left + (index / (history.length - 1)) * width;
+
+                const y = bottom - (trust / 100) * height;
+
+                return {
+                    item,
+                    trust,
+                    x,
+                    y
+                };
+            });
+
+            const pointString = points
+                .map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`)
+                .join(" ");
+
+            line.setAttribute("points", pointString);
+
+            const areaPoints = [
+                `${points[0].x.toFixed(1)},${bottom}`,
+                pointString,
+                `${points[points.length - 1].x.toFixed(1)},${bottom}`
+            ].join(" ");
+
+            area.setAttribute("points", areaPoints);
+
+            const labelEvery = Math.max(1, Math.ceil(points.length / 6));
+
+            pointsGroup.innerHTML = points.map((point, index) => {
+                const showLabel =
+                    index % labelEvery === 0 ||
+                    index === points.length - 1;
+
+                const stressLabel =
+                    formatNumber(point.item.stress_level, 1) + "x";
+
+                return `
+                    <g>
+                        <circle cx="${point.x}" cy="${point.y}" r="7" fill="#080D18" stroke="#22D3EE" stroke-width="3">
+                            <title>Stress ${stressLabel} · Trust ${formatNumber(point.trust)}</title>
+                        </circle>
+                        ${showLabel ? `<text class="chart-label" text-anchor="middle" x="${point.x}" y="242">${stressLabel}</text>` : ""}
+                    </g>
+                `;
+            }).join("");
+
+            const riskiest = history.reduce((current, item) => {
+                const currentRisk = asNumber(current.correlated_failure_rate) ?? -1;
+                const nextRisk = asNumber(item.correlated_failure_rate) ?? -1;
+
+                return nextRisk > currentRisk ? item : current;
+            });
+
+            safeText(
+                "trajectoryStatus",
+                `LIVE / ${history.length} RUNS`
+            );
+
+            safeText(
+                "trajectoryRisk",
+                formatPercent(riskiest.correlated_failure_rate)
+            );
+
+            if (narrative) {
+                narrative.textContent =
+                    `At ${formatNumber(riskiest.stress_level, 1)}x stress, trust falls to ${formatNumber(riskiest.trust_score)} while correlated risk reaches ${formatPercent(riskiest.correlated_failure_rate)}.`;
+            }
+        }
+
+
+        async function loadTrustTrajectory() {
+            try {
+                const response = await fetch(
+                    `${API_BASE}/trust-history`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Trust history API unavailable");
+                }
+
+                const data = await response.json();
+
+                renderTrustTrajectory(getHistoryItems(data));
+
+                return true;
+
+            } catch (error) {
+                console.error("Trust trajectory error:", error);
+                safeText("trajectoryStatus", "DATA UNAVAILABLE");
+                safeText("trajectoryRisk", "--");
+
+                return false;
+            }
+        }
+
+
+        /* =========================
+           MODAL
+        ========================= */
+
+        function openModal(title, content) {
+
+            const oldModal =
+                document.getElementById("prismModal");
+
+            if (oldModal) {
+                oldModal.remove();
+            }
+
+
+            const modal =
+                document.createElement("div");
+
+            modal.id = "prismModal";
+
+            modal.className =
+                "fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4";
+
+
+            modal.innerHTML = `
+
+                <div class="w-full max-w-4xl bg-surface border border-outline-variant rounded-2xl shadow-2xl">
+
+                    <div class="flex justify-between items-center p-6 border-b border-outline-variant">
+
+                        <div>
+
+                            <div class="font-mono text-[10px] text-primary tracking-widest">
+                                PRISM INTELLIGENCE
+                            </div>
+
+                            <h2 class="text-2xl font-bold mt-1">
+                                ${title}
+                            </h2>
+
+                        </div>
+
+                        <button id="closeModal"
+                            class="text-on-surface-variant hover:text-primary">
+
+                            <span class="material-symbols-outlined">
+                                close
+                            </span>
+
+                        </button>
+
+                    </div>
+
+                    <div class="p-6 max-h-[70vh] overflow-y-auto">
+
+                        ${content}
+
+                    </div>
+
+                </div>
+            `;
+
+
+            document.body.appendChild(modal);
+
+
+            $("closeModal").addEventListener(
+                "click",
+                () => modal.remove()
+            );
+
+            return modal;
+
+        }
+
+
+        /* =========================
+           STRESS TEST
+        ========================= */
+
+        async function runStressTest() {
+
+            const button = $("stressTestBtn");
+
+            if (!button) {
+                return;
+            }
+
+            const originalContent = button.innerHTML;
+
+            button.innerHTML = `
+                <span class="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                <span>Simulating...</span>
+            `;
+            button.disabled = true;
+
+            try {
+
+                const selectedStress = Number(
+                    $("stressLevel")?.value || 1.5
+                );
+
+                const response = await fetch(
+                    `${API_BASE}/stress-test?stress_level=${selectedStress}`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Stress test failed");
+                }
+
+                const data = await response.json();
+
+                updateAlertCenter(
+                    data.correlated_failure_rate,
+                    `Stress test / ${formatNumber(data.stress_level, 1)}x`,
+                    "stress"
+                );
+
+                lastStressResult = {
+                    ...data,
+                    completedAt: new Date().toISOString()
+                };
+
+                openModal(
+                    "Adversarial Stress Simulation",
+
+                    `
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div class="p-5 bg-surface-container-high rounded-xl border border-outline-variant">
+                            <div class="text-xs text-on-surface-variant">TRUST SCORE</div>
+                            <div class="text-3xl font-mono text-cyan mt-2">${formatNumber(data.trust_score)}</div>
+                        </div>
+
+                        <div class="p-5 bg-surface-container-high rounded-xl border border-outline-variant">
+                            <div class="text-xs text-warning">CORRELATED RISK</div>
+                            <div class="text-3xl font-mono text-warning mt-2">${formatPercent(data.correlated_failure_rate)}</div>
+                        </div>
+
+                        <div class="p-5 bg-surface-container-high rounded-xl border border-outline-variant">
+                            <div class="text-xs text-on-surface-variant">PERFORMANCE</div>
+                            <div class="text-3xl font-mono text-primary mt-2">${formatPercent(data.performance)}</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mt-5">
+                        <div class="p-5 bg-surface-container-high rounded-xl border border-outline-variant">
+                            <div class="text-xs text-on-surface-variant">CALIBRATION</div>
+                            <div class="text-xl font-mono mt-2">${formatNumber(data.calibration)}</div>
+                        </div>
+
+                        <div class="p-5 bg-surface-container-high rounded-xl border border-outline-variant">
+                            <div class="text-xs text-on-surface-variant">CORRELATION</div>
+                            <div class="text-xl font-mono mt-2">${formatNumber(data.correlation)}</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 p-5 bg-primary/5 border border-primary/30 rounded-xl">
+                        <div class="font-mono text-xs text-primary mb-2">AI ASSESSMENT</div>
+                        <p class="text-on-surface-variant">
+                            PRISM simulated adversarial operating conditions at
+                            <span class="font-mono text-on-surface">${formatNumber(data.stress_level, 1)}x</span>
+                            intensity and recalculated systemic trust under stress.
+                        </p>
+                    </div>
+                    `
+                );
+
+                loadTrustTrajectory();
+
+            } catch (error) {
+
+                console.error("Stress test error:", error);
+                alert("Stress test failed. Check backend.");
+
+            } finally {
+
+                button.innerHTML = originalContent;
+                button.disabled = false;
+
+            }
+
+        }
+
+
+        /* =========================
+           CORRELATION ANALYSIS
+        ========================= */
+
+        async function runCorrelationAnalysis(event) {
+
+            if (event) {
+                event.preventDefault();
+            }
+
+            try {
+
+                const response = await fetch(
+                    `${API_BASE}/correlation-intelligence`
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Correlation API failed"
+                    );
+                }
+
+                const data =
+                    await response.json();
+
+                console.log(
+                    "Correlation Data:",
+                    data
+                );
+
+
+                const comparison = Array.isArray(data.comparison)
+                    ? data.comparison
+                    : [];
+
+                const insight = data.key_insight || {};
+
+                if (!comparison.length) {
+                    openModal(
+                        "Correlation Intelligence",
+                        `
+                        <div class="p-5 bg-surface-container-high border border-outline-variant rounded-xl">
+                            <div class="font-mono text-xs text-primary mb-3">ANALYSIS</div>
+                            <p class="text-on-surface-variant">${escapeHtml(data.analysis || "No comparison data was returned by the API.")}</p>
+                        </div>
+                        `
+                    );
+
+                    return;
+                }
+
+                const rows = comparison.map((item) => `
+                    <tr class="border-b border-outline-variant last:border-0">
+                        <td class="py-4 pr-4">${escapeHtml(item.model_a)}</td>
+                        <td class="py-4 pr-4">${escapeHtml(item.model_b)}</td>
+                        <td class="py-4 pr-4 font-mono text-on-surface-variant">${formatNumber(item.normal_correlation, 3)}</td>
+                        <td class="py-4 pr-4 font-mono text-primary">${formatNumber(item.stress_correlation, 3)}</td>
+                        <td class="py-4 pr-4 font-mono text-warning">${formatNumber(item.correlation_change, 3)}</td>
+                        <td class="py-4 font-mono text-critical">${escapeHtml(item.risk_level)}</td>
+                    </tr>
+                `).join("");
+
+                openModal(
+                    "Correlation Intelligence",
+                    `
+                    <div class="mb-6 p-5 bg-primary/5 border border-primary/30 rounded-xl">
+                        <div class="font-mono text-xs text-primary mb-2">KEY PRISM INSIGHT</div>
+                        <div class="text-lg font-bold">${escapeHtml(insight.models)}</div>
+                        <p class="text-on-surface-variant mt-3">${escapeHtml(insight.message || data.analysis)}</p>
+
+                        <div class="flex flex-wrap gap-8 mt-4">
+                            <div>
+                                <div class="font-mono text-[10px] text-on-surface-variant">CORRELATION CHANGE</div>
+                                <div class="font-mono text-xl text-warning mt-1">${formatNumber(insight.correlation_change, 3)}</div>
+                            </div>
+                            <div>
+                                <div class="font-mono text-[10px] text-on-surface-variant">RISK LEVEL</div>
+                                <div class="font-mono text-xl text-critical mt-1">${escapeHtml(insight.risk_level)}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="font-mono text-[10px] text-on-surface-variant border-b border-outline-variant">
+                                <tr>
+                                    <th class="pb-3 pr-4">MODEL A</th>
+                                    <th class="pb-3 pr-4">MODEL B</th>
+                                    <th class="pb-3 pr-4">NORMAL</th>
+                                    <th class="pb-3 pr-4">STRESS</th>
+                                    <th class="pb-3 pr-4">CHANGE</th>
+                                    <th class="pb-3">RISK</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                    `
+                );
+
+            }
+
+            catch (error) {
+
+                console.error(error);
+
+                alert(
+                    "Failed to connect to Correlation Intelligence API"
+                );
+
+            }
+
+        }
+
+
+        /* =========================
+           RED TEAM
+        ========================= */
+
+        async function runRedTeam(event) {
+
+            if (event) {
+                event.preventDefault();
+            }
+
+            try {
+
+                const response = await fetch(
+                    `${API_BASE}/red-team`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Red Team API failed");
+                }
+
+                const data = await response.json();
+                const scenario = data.worst_scenario || {};
+                const incident = data.incident || {};
+
+                const metric = (value, suffix = "") => {
+                    const number = Number(value);
+
+                    return Number.isFinite(number)
+                        ? number.toFixed(2) + suffix
+                        : "--";
+                };
+
+                const recommendations =
+                    incident.recommended_actions ||
+                    incident.recommendations ||
+                    ["Review affected models and reduce operational stress."];
+
+                const actionList = Array.isArray(recommendations)
+                    ? recommendations
+                    : [recommendations];
+
+                const actionsHtml = actionList
+                    .filter(Boolean)
+                    .map((action) => `<li>• ${escapeHtml(action)}</li>`)
+                    .join("");
+
+                openModal(
+                    "AI Red Team — Incident Report",
+
+                    `
+                    <div class="space-y-5">
+                        <div class="p-5 bg-critical/5 border border-critical/30 rounded-xl">
+                            <div class="font-mono text-xs text-critical">
+                                ${escapeHtml(incident.severity || "CRITICAL")} SEVERITY INCIDENT
+                            </div>
+
+                            <div class="text-2xl font-bold mt-2">
+                                ${escapeHtml(incident.incident_id || "PRISM INCIDENT")}
+                            </div>
+
+                            <p class="text-on-surface-variant mt-3">
+                                ${escapeHtml(incident.root_cause || "Operational stress is causing correlated AI failures.")}
+                            </p>
+                        </div>
+
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="p-4 bg-surface-container-high rounded-xl">
+                                <div class="font-mono text-[10px] text-on-surface-variant">SCENARIO</div>
+                                <div class="text-xl font-mono mt-2">${escapeHtml(scenario.scenario_id)}</div>
+                            </div>
+
+                            <div class="p-4 bg-surface-container-high rounded-xl">
+                                <div class="font-mono text-[10px] text-on-surface-variant">STRESS</div>
+                                <div class="text-xl font-mono text-warning mt-2">${metric(scenario.stress_level)}x</div>
+                            </div>
+
+                            <div class="p-4 bg-surface-container-high rounded-xl">
+                                <div class="font-mono text-[10px] text-on-surface-variant">TRUST SCORE</div>
+                                <div class="text-xl font-mono text-cyan mt-2">${metric(scenario.trust_score)}</div>
+                            </div>
+
+                            <div class="p-4 bg-surface-container-high rounded-xl">
+                                <div class="font-mono text-[10px] text-on-surface-variant">CORRELATION RISK</div>
+                                <div class="text-xl font-mono text-critical mt-2">${metric(scenario.correlated_failure_rate, "%")}</div>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-surface-container-high rounded-xl">
+                            <div class="font-mono text-xs text-primary mb-2">HIDDEN PATTERN</div>
+                            <p class="text-on-surface-variant">
+                                ${escapeHtml(incident.hidden_pattern || "Multiple AI systems are failing on overlapping transaction patterns.")}
+                            </p>
+                        </div>
+
+                        <div class="p-5 bg-success/5 border border-success/30 rounded-xl">
+                            <div class="font-mono text-xs text-success mb-3">RECOMMENDED ACTIONS</div>
+                            <ul class="space-y-2 text-on-surface-variant">${actionsHtml}</ul>
+                        </div>
+                    </div>
+                    `
+                );
+
+            } catch (error) {
+
+                console.error("Red Team Error:", error);
+                alert("Red Team API failed. Check backend.");
+
+            }
+
+        }
+
+
+        /* =========================
+           REPORTS
+        ========================= */
+
+        async function openReports(event) {
+
+            if (event) {
+                event.preventDefault();
+            }
+
+            try {
+
+                const response = await fetch(
+                    `${API_BASE}/trust-history`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Trust history API failed");
+                }
+
+                const data = await response.json();
+                const history = getHistoryItems(data);
+
+                const rows = history.length
+                    ? history.map((item) => `
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-surface-container-high rounded-xl border border-outline-variant">
+                            <div>
+                                <div class="font-mono text-[10px] text-on-surface-variant">STRESS LEVEL</div>
+                                <div class="font-mono mt-1">${formatNumber(item.stress_level, 1)}x</div>
+                            </div>
+                            <div>
+                                <div class="font-mono text-[10px] text-on-surface-variant">TRUST</div>
+                                <div class="font-mono text-cyan mt-1">${formatNumber(item.trust_score)}</div>
+                            </div>
+                            <div>
+                                <div class="font-mono text-[10px] text-on-surface-variant">RISK</div>
+                                <div class="font-mono text-warning mt-1">${formatPercent(item.correlated_failure_rate)}</div>
+                            </div>
+                            <div>
+                                <div class="font-mono text-[10px] text-on-surface-variant">STATUS</div>
+                                <div class="font-mono text-critical mt-1">${escapeHtml(item.trust_level)}</div>
+                            </div>
+                        </div>
+                    `).join("")
+                    : `
+                        <div class="p-5 bg-surface-container-high rounded-xl border border-outline-variant text-on-surface-variant">
+                            No trust-history entries were returned by the API.
+                        </div>
+                    `;
+
+                openModal(
+                    "Trust Degradation History",
+                    `<div class="space-y-3">${rows}</div>`
+                );
+
+            } catch (error) {
+
+                console.error("Trust history error:", error);
+                alert("Trust history failed. Check backend.");
+
+            }
+
+        }
+
+
+        /* =========================
+           SETTINGS
+        ========================= */
+
+        function openSettings(event) {
+
+            if (event) {
+                event.preventDefault();
+            }
+
+            openModal(
+                "System Settings",
+
+                `
+                <div class="space-y-4">
+
+                    <div class="p-5 bg-surface-container-high rounded-xl flex justify-between">
+
+                        <div>
+
+                            <div class="font-bold">
+                                Live Telemetry
+                            </div>
+
+                            <div class="text-sm text-on-surface-variant">
+                                Auto refresh every 30 seconds
+                            </div>
+
+                        </div>
+
+                        <span class="text-success font-mono">
+                            ACTIVE
+                        </span>
+
+                    </div>
+
+                    <div class="p-5 bg-surface-container-high rounded-xl flex justify-between">
+
+                        <div>
+
+                            <div class="font-bold">
+                                Adversarial Engine
+                            </div>
+
+                            <div class="text-sm text-on-surface-variant">
+                                Autonomous stress simulation
+                            </div>
+
+                        </div>
+
+                        <span class="text-success font-mono">
+                            READY
+                        </span>
+
+                    </div>
+
+                </div>
+                `
+            );
+
+        }
+
+
+        /* =========================
+           EVENT LISTENERS
+        ========================= */
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            function () {
+
+                refreshDashboardData();
+
+
+                setAutoRefresh(true);
+
+                $("autoRefreshToggle")
+                    ?.addEventListener(
+                        "click",
+                        () => setAutoRefresh(!autoRefreshEnabled)
+                    );
+
+                $("alertCenterBtn")
+                    ?.addEventListener(
+                        "click",
+                        openAlertCenter
+                    );
+
+                $("stressTestBtn")
+                    .addEventListener(
+                        "click",
+                        runStressTest
+                    );
+
+                const stressSlider = $("stressLevel");
+                const stressLevelValue = $("stressLevelValue");
+
+                if (stressSlider && stressLevelValue) {
+                    stressSlider.addEventListener("input", () => {
+                        stressLevelValue.textContent =
+                            Number(stressSlider.value).toFixed(1) + "x";
+                    });
+                }
+
+
+                $("analysisBtn")
+                    .addEventListener(
+                        "click",
+                        runCorrelationAnalysis
+                    );
+
+
+                $("adversarialBtn")
+                    .addEventListener(
+                        "click",
+                        runRedTeam
+                    );
+
+
+                $("reportsBtn")
+                    .addEventListener(
+                        "click",
+                        openReports
+                    );
+
+
+                $("settingsBtn")
+                    .addEventListener(
+                        "click",
+                        openSettings
+                    );
+
+
+                $("dashboardBtn")
+                    .addEventListener(
+                        "click",
+                        function(event) {
+
+                            event.preventDefault();
+
+                            refreshDashboardData();
+
+                            window.scrollTo({
+                                top: 0,
+                                behavior: "smooth"
+                            });
+
+                        }
+                    );
+
+
+
+            }
+        );
+
+    </script>
+
+</body>
+</html>
