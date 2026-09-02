@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import "./App.css";
 
-const API = "http://127.0.0.1:8000";
+const API = "https://prism-intelligence-64q8.onrender.com";
 
 function App() {
   const [dashboard, setDashboard] = useState(null);
