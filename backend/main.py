@@ -466,8 +466,7 @@ def trust_history():
 
     stress_levels = [
         0.5,
-        1.0,
-        1.5,
+        1.2,
         2.0
     ]
 
