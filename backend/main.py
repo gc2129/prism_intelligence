@@ -1,9 +1,16 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["LOKY_MAX_CPU_COUNT"] = "1"
+
+from fastapi.middleware.cors import CORSMiddleware
+...
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI
 from pathlib import Path
 import sys
 import pandas as pd
 from fastapi.middleware.cors import CORSMiddleware
+
 
 
 # ---------------------------------
