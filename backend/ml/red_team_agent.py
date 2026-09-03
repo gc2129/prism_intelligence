@@ -12,7 +12,7 @@ from calibration import calculate_calibration
 from trust_score import calculate_prism_trust_score
 
 
-def generate_attack_scenarios(n_scenarios=15):
+def generate_attack_scenarios(n_scenarios=5):
     """
     AI agent generates different adversarial
     stress intensities to probe model blind spots.
